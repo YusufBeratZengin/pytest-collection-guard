@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-collection-guard"
+version = "0.1.0"
+description = "Fail CI when expected pytest tests disappear from collection."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "YusufBeratZengin" }]
+keywords = [
+    "pytest",
+    "pytest-plugin",
+    "test-discovery",
+    "regression-testing",
+    "ci",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+# Runtime dependencies: none beyond pytest itself.
+# pytest is the only requirement because this package is a pytest plugin and
+# a CLI over its own JSON manifests; the CLI half uses only the standard
+# library (argparse, dataclasses, json, pathlib, platform, tomllib).
+dependencies = ["pytest>=7.0"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-cov>=5.0",
+    "mypy>=1.8",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+pytest-collection-guard = "pytest_collection_guard.cli:main"
+
+[project.entry-points.pytest11]
+collection_guard = "pytest_collection_guard.plugin"
+
+[project.urls]
+Homepage = "https://github.com/YusufBeratZengin/pytest-collection-guard"
+Issues = "https://github.com/YusufBeratZengin/pytest-collection-guard/issues"
+Changelog = "https://github.com/YusufBeratZengin/pytest-collection-guard/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-p pytester"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["pytest_collection_guard"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+warn_unreachable = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "C4",  # comprehensions
+    "RUF", # ruff-specific
+]
