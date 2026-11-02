@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package + dev tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: python -m ruff check src tests
+
+      - name: Format check (ruff)
+        run: python -m ruff format --check src tests
+
+      - name: Type check (mypy strict)
+        run: python -m mypy src
+
+      - name: Tests + branch coverage (>= 85%)
+        run: python -m pytest --cov=pytest_collection_guard --cov-branch --cov-fail-under=85
+
+  check-script:
+    name: scripts/check.sh (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package + dev tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run the quality gate
+        run: bash scripts/check.sh

@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the guard, manifest or CLI misbehaves
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please **do not** include
+        secrets or personal data (redact test node IDs if they are sensitive).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Clear description of the behavior, including the exact commands.
+      placeholder: "pytest --collect-only --collection-guard-out current.json ... then compare ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `python -V`, `pytest --version` and `python -m pip show pytest-collection-guard`.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: manifests
+    attributes:
+      label: Relevant manifest / report output (redacted)
+      description: Minimal manifest excerpt or `--json` report that reproduces the issue.
+      render: json
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed all secrets/personal data from this report
+          required: true
+        - label: I ran `bash scripts/check.sh` on a checkout of the reported version (or explained why not)
+          required: false
