@@ -58,7 +58,12 @@ Changelog = "https://github.com/YusufBeratZengin/pytest-collection-guard/blob/ma
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "-p pytester"
+# -p pytester: hermetic nested-pytest fixtures for the integration tests.
+# -p no:collection_guard: block this repo's own pytest11 entry point so the
+#   plugin module is first imported *during* tests (after pytest-cov starts
+#   measuring). The plugin under test is loaded explicitly by the tests via
+#   "-p pytest_collection_guard.plugin"; real users are unaffected.
+addopts = "-p pytester -p no:collection_guard"
 testpaths = ["tests"]
 pythonpath = ["src"]
 

@@ -348,7 +348,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     if args.command == "demo":
         return run_demo(args.dir)
-    parser.error(f"unknown command {args.command!r}")
+    parser.error(f"unknown command {args.command!r}")  # pragma: no cover
 
 
 if __name__ == "__main__":  # pragma: no cover
