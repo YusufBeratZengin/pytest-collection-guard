@@ -7,7 +7,9 @@ edit, a typo in a rename, or one lost parametrization case silently shrinks
 your test suite while the run stays green. pytest-collection-guard records
 which test IDs pytest *collects* and turns unexpected loss into a CI failure.
 
-- **English** · [Türkçe (README.tr.md)](README.tr.md)
+- **English** · [Türkçe (README.tr.md)](README.tr.md) ·
+  [Terminal recording](docs/TERMINAL-RECORDING.md) · [Changelog](CHANGELOG.md) ·
+  [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## Why
 

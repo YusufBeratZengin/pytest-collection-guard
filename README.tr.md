@@ -4,7 +4,8 @@ Pytest'in topladığı (keşfettiği) test kimliklerini sürümler arasında kar
 
 "100 test geçti" demek, geçen testlerin *aynı* 100 test olduğu anlamına gelmez. Bir `testpaths` değişikliği, yanlış yazılmış bir yeniden adlandırma ya da parametrizasyonda kaybolan tek bir durum, test kümesini sessizce küçültürken koşu yine yeşil kalır. pytest-collection-guard, pytest'in *topladığı* test kimliklerini kaydeder ve beklenmeyen kaybı CI hatasına dönüştürür.
 
-- **Türkçe** · [English (README.md)](README.md)
+- **Türkçe** · [English (README.md)](README.md) ·
+  [Terminal kaydı (docs/TERMINAL-RECORDING.md)](docs/TERMINAL-RECORDING.md)
 
 ## Neden
 

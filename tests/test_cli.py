@@ -328,3 +328,22 @@ def test_streams_can_be_redirected(make_manifest, write_manifest) -> None:
     assert code == EXIT_OK
     assert "RESULT: OK" in stdout.getvalue()
     assert stderr.getvalue() == ""
+
+
+def test_package_main_module_runs_in_process(tmp_path: Path, monkeypatch) -> None:
+    """``python -m pytest_collection_guard`` runs ``__main__.run()`` in-process.
+
+    The subprocess path itself is covered by
+    ``test_module_entry_point_works``; this test exercises the importable
+    entry-point function with real arguments so the code path stays traced.
+    """
+    import sys
+
+    from pytest_collection_guard.__main__ import run
+
+    demo_dir = tmp_path / "demo"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["pytest-collection-guard", "demo", "--dir", str(demo_dir)])
+    assert run() == EXIT_OK
+    assert (demo_dir / "baseline.json").is_file()
+    assert (demo_dir / "current.json").is_file()
