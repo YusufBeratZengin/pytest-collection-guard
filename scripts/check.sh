@@ -10,6 +10,13 @@
 # pytest-cov) which are installed once via: python3 -m pip install -e ".[dev]"
 # (the script attempts that automatically if they are missing).
 # No step needs network access once dependencies are installed.
+#
+# Interpreter resolution: PYTHON (or python3) is preferred. If it lacks the
+# dev tools, the script first looks for another python3 on PATH that already
+# has them (e.g. a pip-less venv shadowing the system interpreter), and only
+# then falls back to installing into the chosen interpreter — bootstrapping
+# pip via ensurepip first, because venvs created --without-pip (or by uv)
+# have no pip module.
 
 set -euo pipefail
 
@@ -17,12 +24,46 @@ cd "$(dirname "$0")/.."
 
 PY="${PYTHON:-python3}"
 
-if ! "$PY" -m ruff --version >/dev/null 2>&1 \
-   || ! "$PY" -m mypy --version >/dev/null 2>&1 \
-   || ! "$PY" -c "import pytest_cov" >/dev/null 2>&1; then
-  echo "check.sh: installing dev dependencies (ruff, mypy, pytest-cov) ..."
-  "$PY" -m pip install -e ".[dev]" --quiet
+tools_ok() {
+  "$1" -m ruff --version >/dev/null 2>&1 \
+    && "$1" -m mypy --version >/dev/null 2>&1 \
+    && "$1" -c "import pytest_cov" >/dev/null 2>&1
+}
+
+if ! tools_ok "$PY"; then
+  if [ -z "${PYTHON:-}" ]; then
+    echo "check.sh: dev tools missing for '$PY'; looking for an interpreter that has them ..."
+    BASE_PY="$("$PY" -c 'import os, sys; print(os.path.join(sys.base_prefix, "bin", "python3"))' 2>/dev/null || true)"
+    for cand in $(type -aP python3 python 2>/dev/null || true) "$BASE_PY"; do
+      [ -x "$cand" ] || continue
+      if tools_ok "$cand"; then
+        PY="$cand"
+        break
+      fi
+    done
+  fi
 fi
+
+if ! tools_ok "$PY"; then
+  echo "check.sh: installing dev dependencies (ruff, mypy, pytest-cov) into $PY ..."
+  if ! "$PY" -m pip --version >/dev/null 2>&1; then
+    # venvs created --without-pip (or by uv) have no pip module; bootstrap it.
+    "$PY" -m ensurepip --upgrade >/dev/null 2>&1 \
+      || "$PY" -m ensurepip >/dev/null 2>&1 \
+      || true
+  fi
+  if "$PY" -m pip --version >/dev/null 2>&1; then
+    "$PY" -m pip install -e ".[dev]" --quiet
+  fi
+fi
+
+if ! tools_ok "$PY"; then
+  echo "check.sh: cannot run the dev tools (ruff, mypy, pytest-cov) with any python found." >&2
+  echo "check.sh: install them for your interpreter, e.g.:" >&2
+  echo "  python3 -m pip install -e \".[dev]\"   (or: python3 -m ensurepip --upgrade first)" >&2
+  exit 1
+fi
+echo "check.sh: using interpreter: $PY"
 
 echo "== ruff lint =="
 "$PY" -m ruff check src tests
