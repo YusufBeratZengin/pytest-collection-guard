@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -9,7 +10,9 @@ from typing import Any, cast
 from pytest_collection_guard.plugin import (
     _GuardRecorder,
     _ini_list,
+    _option_sequence,
     _option_str,
+    build_collection_args,
     normalize_positional_args,
 )
 
@@ -17,8 +20,16 @@ from pytest_collection_guard.plugin import (
 class _FakeConfig:
     """Minimal stand-in exposing just getini/option, as plugin helpers use."""
 
-    def __init__(self, ini: dict, **options: object) -> None:
+    def __init__(
+        self,
+        ini: dict,
+        rootpath: Path | None = None,
+        args: Sequence[str] = (),
+        **options: object,
+    ) -> None:
         self._ini = ini
+        self.rootpath = rootpath or Path(".")
+        self.args = list(args)
         self.option = SimpleNamespace(**options)
 
     def getini(self, name: str) -> object:
@@ -72,3 +83,52 @@ def test_absolute_args_outside_rootdir_kept_portable(tmp_path: Path) -> None:
 
 def test_no_args_is_empty() -> None:
     assert normalize_positional_args([], Path("/example")) == ()
+
+
+def test_option_sequence_handles_missing_str_and_list() -> None:
+    config = cast(
+        Any,
+        _FakeConfig(
+            {},
+            ignore=["tests/old", "tests/legacy"],
+            single="tests/single",
+            empty=[],
+            missing=None,
+        ),
+    )
+    assert _option_sequence(config, "ignore") == ("tests/old", "tests/legacy")
+    assert _option_sequence(config, "single") == ("tests/single",)
+    assert _option_sequence(config, "empty") == ()
+    assert _option_sequence(config, "missing") == ()
+    assert _option_sequence(config, "not_there") == ()
+
+
+def test_build_collection_args_snapshots_all_options(tmp_path: Path) -> None:
+    root = tmp_path
+    config = cast(
+        Any,
+        _FakeConfig(
+            {
+                "testpaths": ["tests"],
+                "norecursedirs": [".git"],
+                "python_files": ["test_*.py"],
+                "python_classes": ["Test*"],
+                "python_functions": ["test_*"],
+            },
+            rootpath=root,
+            args=[str(root / "tests" / "unit")],
+            keyword="shop",
+            markexpr="not slow",
+            ignore=[str(root / "tests" / "legacy"), "tests/old"],
+            ignore_glob=["tests/legacy/*.py"],
+            deselect=["tests/test_a.py::test_one"],
+        ),
+    )
+    args = build_collection_args(config)
+    assert args.testpaths == ("tests",)
+    assert args.positional_args == ("tests/unit",)
+    assert args.keyword == "shop"
+    assert args.markexpr == "not slow"
+    assert args.ignore == ("tests/legacy", "tests/old")
+    assert args.ignore_glob == ("tests/legacy/*.py",)
+    assert args.deselect == ("tests/test_a.py::test_one",)

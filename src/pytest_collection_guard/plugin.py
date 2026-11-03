@@ -103,6 +103,15 @@ def _option_str(config: pytest.Config, name: str) -> str | None:
     return text or None
 
 
+def _option_sequence(config: pytest.Config, name: str) -> tuple[str, ...]:
+    value = getattr(config.option, name, None)
+    if not value:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    return tuple(str(item) for item in value)
+
+
 def normalize_positional_args(args: Sequence[str], rootdir: Path) -> tuple[str, ...]:
     """Store positional collection args portably (POSIX separators, rootdir-relative).
 
@@ -125,6 +134,9 @@ def normalize_positional_args(args: Sequence[str], rootdir: Path) -> tuple[str, 
 def build_collection_args(config: pytest.Config) -> CollectionArgs:
     """Snapshot every setting that changes *which* tests are collected."""
     rootdir = Path(str(config.rootpath))
+    ignore_raw = _option_sequence(config, "ignore")
+    ignore_glob_raw = _option_sequence(config, "ignore_glob")
+    deselect_raw = _option_sequence(config, "deselect")
     return CollectionArgs(
         testpaths=_ini_list(config, "testpaths"),
         norecursedirs=_ini_list(config, "norecursedirs"),
@@ -134,6 +146,9 @@ def build_collection_args(config: pytest.Config) -> CollectionArgs:
         positional_args=normalize_positional_args(list(config.args), rootdir),
         keyword=_option_str(config, "keyword"),
         markexpr=_option_str(config, "markexpr"),
+        ignore=tuple(sorted(normalize_positional_args(ignore_raw, rootdir))),
+        ignore_glob=tuple(sorted(arg.replace("\\", "/") for arg in ignore_glob_raw)),
+        deselect=tuple(sorted(arg.replace("\\", "/") for arg in deselect_raw)),
     )
 
 
@@ -227,5 +242,8 @@ class _GuardRecorder:
             save_manifest(self.out_path, manifest)
         except OSError as exc:
             self.write_error = f"{self.out_path}: {exc}"
+            session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
+            if self.out_path.is_file():
+                self.out_path.unlink(missing_ok=True)
             return
         self.written = self.out_path

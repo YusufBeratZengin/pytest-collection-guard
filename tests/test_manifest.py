@@ -45,6 +45,9 @@ def _valid_dict() -> dict:
             "positional_args": ["tests"],
             "keyword": None,
             "markexpr": None,
+            "ignore": [],
+            "ignore_glob": [],
+            "deselect": [],
         },
         "errors": [],
     }
@@ -110,6 +113,9 @@ def test_error_status_round_trip(make_manifest) -> None:
         (lambda d: d.pop("collection_args"), "missing required key 'collection_args'"),
         (lambda d: d["collection_args"].pop("testpaths"), "missing required key 'testpaths'"),
         (lambda d: d["collection_args"].update(keyword=5), "expected a string"),
+        (lambda d: d["collection_args"].update(ignore="nope"), "expected a list of strings"),
+        (lambda d: d["collection_args"].update(ignore_glob="nope"), "expected a list of strings"),
+        (lambda d: d["collection_args"].update(deselect="nope"), "expected a list of strings"),
         (lambda d: d.update(errors="nope"), "expected a list of strings"),
     ],
 )
@@ -197,9 +203,52 @@ def test_collection_args_mismatches_every_enforced_field() -> None:
         ("python_files", ("x",)),
         ("python_classes", ("x",)),
         ("python_functions", ("x",)),
+        ("ignore", ("tests/old",)),
+        ("ignore_glob", ("*_skip.py",)),
+        ("deselect", ("tests/test_a.py::test_one",)),
     ):
         flipped = CollectionArgs(**{field: value})  # type: ignore[arg-type]
         assert any(field in issue for issue in flipped.mismatches(CollectionArgs()))
 
     flipped_args = CollectionArgs(positional_args=("unit",))
     assert any("positional_args" in issue for issue in flipped_args.mismatches(CollectionArgs()))
+
+
+def test_save_manifest_atomic_write_and_cleanup(tmp_path: Path, make_manifest, monkeypatch) -> None:
+    path = tmp_path / "manifest.json"
+    manifest1 = make_manifest(selected=("tests/test_a.py::test_one",))
+    save_manifest(path, manifest1)
+    assert load_manifest(path) == manifest1
+
+    # Overwrite atomically with manifest2
+    manifest2 = make_manifest(selected=("tests/test_a.py::test_two",))
+    save_manifest(path, manifest2)
+    assert load_manifest(path) == manifest2
+
+    # Simulated failure during write: target must remain intact, temp files cleaned up
+    def _failing_replace(src, dst):
+        raise OSError("simulated disk error during replace")
+
+    monkeypatch.setattr("os.replace", _failing_replace)
+    with pytest.raises(OSError, match="simulated disk error"):
+        save_manifest(path, manifest1)
+
+    # Original manifest2 still intact
+    assert load_manifest(path) == manifest2
+    # No temporary files left behind in directory
+    temp_files = list(tmp_path.glob(".*.tmp"))
+    assert temp_files == []
+
+
+def test_save_manifest_failure_before_tmp_created(
+    tmp_path: Path, make_manifest, monkeypatch
+) -> None:
+    path = tmp_path / "manifest.json"
+    manifest = make_manifest()
+
+    def _failing_temp(*args, **kwargs):
+        raise OSError("cannot create temp file")
+
+    monkeypatch.setattr("tempfile.NamedTemporaryFile", _failing_temp)
+    with pytest.raises(OSError, match="cannot create temp file"):
+        save_manifest(path, manifest)

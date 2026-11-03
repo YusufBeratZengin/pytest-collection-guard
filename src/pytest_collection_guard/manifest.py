@@ -34,6 +34,8 @@ __all__ = [
 ]
 
 import json
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -149,6 +151,9 @@ class CollectionArgs:
     positional_args: tuple[str, ...] = ()
     keyword: str | None = None
     markexpr: str | None = None
+    ignore: tuple[str, ...] = ()
+    ignore_glob: tuple[str, ...] = ()
+    deselect: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -160,6 +165,9 @@ class CollectionArgs:
             "positional_args": list(self.positional_args),
             "keyword": self.keyword,
             "markexpr": self.markexpr,
+            "ignore": list(self.ignore),
+            "ignore_glob": list(self.ignore_glob),
+            "deselect": list(self.deselect),
         }
 
     @classmethod
@@ -189,6 +197,9 @@ class CollectionArgs:
             ),
             keyword=_as_opt_str(data.get("keyword"), "collection_args.keyword"),
             markexpr=_as_opt_str(data.get("markexpr"), "collection_args.markexpr"),
+            ignore=_as_str_tuple(data.get("ignore", []), "collection_args.ignore"),
+            ignore_glob=_as_str_tuple(data.get("ignore_glob", []), "collection_args.ignore_glob"),
+            deselect=_as_str_tuple(data.get("deselect", []), "collection_args.deselect"),
         )
 
     def mismatches(self, other: CollectionArgs) -> tuple[str, ...]:
@@ -201,6 +212,9 @@ class CollectionArgs:
             "python_classes",
             "python_functions",
             "positional_args",
+            "ignore",
+            "ignore_glob",
+            "deselect",
         ):
             mine: tuple[str, ...] = getattr(self, name)
             theirs: tuple[str, ...] = getattr(other, name)
@@ -285,7 +299,25 @@ def save_manifest(path: str | Path, manifest: Manifest) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(manifest_to_dict(manifest), indent=2, sort_keys=False) + "\n"
-    target.write_text(text, encoding="utf-8")
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target.parent,
+            prefix=f".{target.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+            tmp.write(text)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp_path, target)
+    except Exception:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def load_manifest(path: str | Path) -> Manifest:

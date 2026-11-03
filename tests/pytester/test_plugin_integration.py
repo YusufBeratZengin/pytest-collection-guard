@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from pytest_collection_guard.cli import EXIT_MISMATCH, EXIT_REMOVALS, run_compare
 from pytest_collection_guard.manifest import save_manifest
 
@@ -270,4 +272,90 @@ def test_manifest_write_failure_is_reported(guard_run, write_test_file, pytester
     (pytester.path / "outdir").mkdir()
 
     result = guard_run(out="outdir")  # a directory cannot hold the manifest
+    assert result.ret != 0
+    assert result.ret == pytest.ExitCode.INTERNAL_ERROR
     assert "FAILED to write manifest" in result.stdout.str()
+
+
+def test_manifest_write_failure_fails_ci_and_invalidates_stale_file(
+    guard_run, write_test_file, pytester, monkeypatch
+) -> None:
+    write_test_file("tests/test_alpha.py", "def test_one():\n    assert True\n")
+    stale_file = pytester.path / "current.json"
+    stale_payload = '{"status": "ok", "identity": {"selected": ["old::test"]}}'
+    stale_file.write_text(stale_payload, encoding="utf-8")
+
+    def _failing_save(*args, **kwargs):
+        raise OSError("simulated disk write error")
+
+    monkeypatch.setattr("pytest_collection_guard.plugin.save_manifest", _failing_save)
+
+    result = guard_run(out="current.json")
+    # Pytest must fail so CI pipeline does not proceed to compare
+    assert result.ret != 0
+    assert result.ret == pytest.ExitCode.INTERNAL_ERROR
+    assert "FAILED to write manifest" in result.stdout.str()
+
+    # Stale manifest must not remain so CI cannot mistakenly compare obsolete inventory
+    assert not stale_file.exists()
+
+
+def test_ignore_option_mismatch_refuses_comparison(
+    guard_run, read_manifest, write_test_file, tmp_path: Path
+) -> None:
+    write_test_file("tests/test_alpha.py", "def test_one():\n    assert True\n")
+    write_test_file("tests/test_beta.py", "def test_two():\n    assert True\n")
+
+    guard_run(out="baseline.json")
+    guard_run("--ignore=tests/test_beta.py", out="current.json")
+
+    base = read_manifest("baseline.json")
+    curr = read_manifest("current.json")
+    b_path = tmp_path / "base.json"
+    c_path = tmp_path / "curr.json"
+    save_manifest(b_path, base)
+    save_manifest(c_path, curr)
+
+    # Instead of reporting test_two as unapproved lost test (exit 1),
+    # the guard must refuse comparison due to collection scope mismatch (exit 2).
+    assert run_compare(b_path, c_path) == EXIT_MISMATCH
+
+
+def test_ignore_glob_mismatch_refuses_comparison(
+    guard_run, read_manifest, write_test_file, tmp_path: Path
+) -> None:
+    write_test_file("tests/test_alpha.py", "def test_one():\n    assert True\n")
+    write_test_file("tests/test_beta.py", "def test_two():\n    assert True\n")
+
+    guard_run(out="baseline.json")
+    guard_run("--ignore-glob=*_beta.py", out="current.json")
+
+    base = read_manifest("baseline.json")
+    curr = read_manifest("current.json")
+    b_path = tmp_path / "base.json"
+    c_path = tmp_path / "curr.json"
+    save_manifest(b_path, base)
+    save_manifest(c_path, curr)
+
+    assert run_compare(b_path, c_path) == EXIT_MISMATCH
+
+
+def test_deselect_option_mismatch_refuses_comparison(
+    guard_run, read_manifest, write_test_file, tmp_path: Path
+) -> None:
+    write_test_file(
+        "tests/test_alpha.py",
+        "def test_one():\n    assert True\n\ndef test_two():\n    assert True\n",
+    )
+
+    guard_run(out="baseline.json")
+    guard_run("--deselect=tests/test_alpha.py::test_two", out="current.json")
+
+    base = read_manifest("baseline.json")
+    curr = read_manifest("current.json")
+    b_path = tmp_path / "base.json"
+    c_path = tmp_path / "curr.json"
+    save_manifest(b_path, base)
+    save_manifest(c_path, curr)
+
+    assert run_compare(b_path, c_path) == EXIT_MISMATCH
