@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Snapshot `--ignore`, `--ignore-glob`, and `--deselect` options in collection arguments so scope changes produce exit code 2 (mismatch) rather than false test loss.
+- Atomic manifest writing via temporary file and `os.replace` to prevent corrupted inventories on interrupted runs.
+- Immediate CI failure on manifest write error (`INTERNAL_ERROR`) and invalidation of stale output files.
+- Documented secret scanning heuristics and collection scope boundaries in `README.md`, `README.tr.md`, `SECURITY.md`, and `scripts/check.sh`.
+
 ## [0.1.0] - 2026-11-03
 
 ### Added

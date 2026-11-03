@@ -78,6 +78,11 @@ echo "== pytest + coverage (>= 85%, branch) =="
 "$PY" -m pytest --cov=pytest_collection_guard --cov-branch --cov-fail-under=85
 
 echo "== secret scan (dependency-free) =="
+# Scope and boundaries: dependency-free heuristic regex scan targeting common
+# credential types (AWS key IDs, GitHub PATs, Slack tokens, PEM private key blocks,
+# and generic credential variable assignments with literal strings).
+# This is an early repository sanity gate for local commits and CI; it does not
+# substitute for dedicated entropy-based secret scanning or commercial enterprise SAST tooling.
 SECRET_HITS="$(grep -rInE \
   --exclude-dir=.git --exclude-dir=.mypy_cache --exclude-dir=.ruff_cache \
   --exclude-dir=.pytest_cache --exclude-dir=demo --exclude-dir='*egg-info' \

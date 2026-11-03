@@ -132,7 +132,16 @@ Kaldırımı **gerçekleşmemiş** bir izin kaydı `STALE ALLOW ENTRIES` olarak 
 Manifest, iki tür veriyi kesinlikle ayırır:
 
 - **kimlik (identity)** — sıralanmış `selected`/`deselected` test node kimlikleri. Karşılaştırılan veri budur. (Node kimlikleri rootdir'e görelidir; `test_checkout[paypal]` gibi parametre kimlikleri olduğu gibi kaydedilir.)
-- **ortam (environment)** — profil etiketi, platform, Python/pytest sürümleri, rootdir ve toplamayı etkileyen argümanlar (`testpaths`, adlandırma kuralları, `norecursedirs`, konumsal argümanlar, `-k`, `-m`). Karşılaştırılabilirlik için yalnızca **profil** ve **toplama argümanları** denetlenir; geri kalanı insanlar için kaydedilir.
+- **ortam (environment)** — profil etiketi, platform, Python/pytest sürümleri, rootdir ve toplamayı etkileyen argümanlar (`testpaths`, adlandırma kuralları, `norecursedirs`, konumsal argümanlar, `-k`, `-m`, `--ignore`, `--ignore-glob`, `--deselect`). Karşılaştırılabilirlik için yalnızca **profil** ve **toplama argümanları** denetlenir; geri kalanı insanlar için kaydedilir.
+
+### İzlenen ayarlar ve karşılaştırma sınırları
+
+- **İzlenen toplama ayarları**: `testpaths`, `norecursedirs`, `python_files`, `python_classes`, `python_functions`, konumsal argümanlar, `-k`, `-m`, `--ignore`, `--ignore-glob` veya `--deselect` seçeneklerindeki herhangi bir fark, `compare` komutunun sahte test kaybı raporlamak yerine karşılaştırmayı reddetmesini (çıkış kodu `2`) sağlar.
+- **Atomik manifest yazımı**: manifestler önce geçici dosyaya yazılır ve `os.replace` ile atomik olarak hedefle değiştirilir. Yazma başarısız olursa eski çıktı dosyası geçersiz kılınır ve pytest sıfır dışı (`INTERNAL_ERROR`) kodla sonlanır; böylece CI adımları yanlışlıkla eski envanteri karşılaştıramaz.
+- **Kaydedilmeyen ayarlar ve karşılaştırma sınırları**:
+  - *Dinamik çalışma zamanı koşulları*: kod içi kontroller (ör. `if sys.platform == "win32"` veya harici veritabanından/ortam değişkenlerinden beslenen dinamik test üreteçleri) pytest CLI/ini ayarlarını değiştirmeden toplamayı etkiler. Farklı ortamlar için ayrı `--collection-guard-profile` değerleri (ör. `linux`, `windows`) ve profil başına bağımsız baz dosyaları kullanın.
+  - *Üçüncü taraf eklenti filtreleri*: standart pytest toplama ayarları dışında kalan üçüncü taraf eklenti bayrakları izlenmez.
+  - *Toplama sırası*: envanterdeki test sırası karşılaştırmayı etkilemez (kimlikler küme olarak karşılaştırılır).
 
 ## Önemli davranış notları
 

@@ -161,8 +161,29 @@ A manifest strictly separates two kinds of data:
   `test_checkout[paypal]` are recorded verbatim.)
 - **environment** — profile label, platform, Python/pytest versions, rootdir,
   and collection-affecting arguments (`testpaths`, naming rules, `norecursedirs`,
-  positional args, `-k`, `-m`). Only the **profile** and the **collection
-  arguments** are enforced for comparability; the rest is recorded for humans.
+  positional args, `-k`, `-m`, `--ignore`, `--ignore-glob`, `--deselect`).
+  Only the **profile** and the **collection arguments** are enforced for
+  comparability; the rest is recorded for humans.
+
+### Tracked settings vs unrecorded collection limits
+
+- **Tracked collection settings**: any mismatch in `testpaths`, `norecursedirs`,
+  `python_files`, `python_classes`, `python_functions`, positional arguments,
+  `-k`, `-m`, `--ignore`, `--ignore-glob`, or `--deselect` causes `compare` to
+  refuse the comparison (exit code `2`) rather than false-reporting lost tests.
+- **Atomic manifest writing**: manifests are written to a temporary file and
+  atomically swapped via `os.replace`. If writing fails, any existing stale output
+  file is invalidated and pytest exits non-zero (`INTERNAL_ERROR`), ensuring CI
+  pipelines never silently compare an old inventory.
+- **Unrecorded settings and comparison limits**:
+  - *Dynamic runtime conditions*: code-level guards (e.g. `if sys.platform == "win32"`
+    or dynamic test generators based on external databases or environment variables)
+    change collection without changing CLI/ini options. Use distinct `--collection-guard-profile`
+    values (e.g. `linux`, `windows`) and maintain dedicated baselines per profile.
+  - *Third-party plugin filters*: flags from third-party plugins that alter collection
+    hooks outside pytest's standard collection options are not captured.
+  - *Collection order*: test order within an inventory does not affect comparison
+    (node IDs are compared as deterministic sets).
 
 ## Important behavior notes
 

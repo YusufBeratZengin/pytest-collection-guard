@@ -36,3 +36,14 @@ suggested fix.
 The runtime dependency surface is intentionally tiny (pytest only; the CLI is
 standard library). Dev dependencies are pinned ranges in `pyproject.toml` and
 monitored by Dependabot.
+
+## Secret scanning scope and limitations
+
+The repository quality gate (`scripts/check.sh`) performs a dependency-free heuristic scan for common accidental credentials:
+- AWS access key IDs (`AKIA` prefixes)
+- GitHub personal access tokens (`ghp_` prefixes)
+- Slack tokens (`xox` prefixes)
+- PEM private key blocks (`BEGIN PRIVATE KEY`)
+- Common credential assignment statements with hard-coded values
+
+A "clean" scan result confirms that none of these predefined credential signatures were detected in repository files. It serves as a fast pre-commit sanity check and does not replace deep entropy-based scanning or full enterprise SAST tooling.
