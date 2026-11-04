@@ -84,3 +84,14 @@ jobs:
           /tmp/clean-env/bin/pytest-collection-guard --help
           /tmp/clean-env/bin/pytest-collection-guard demo --dir /tmp/demo-clean
           /tmp/clean-env/bin/pytest-collection-guard compare /tmp/demo-clean/baseline.json /tmp/demo-clean/baseline.json
+
+      - name: Verify the pytest11 entry point loaded from the wheel
+        run: |
+          mkdir -p /tmp/entrypoint/tests
+          printf 'def test_ok():\n    assert True\n' > /tmp/entrypoint/tests/test_ok.py
+          cd /tmp/entrypoint
+          /tmp/clean-env/bin/pytest --collect-only -q \
+            --collection-guard-out manifest.json --collection-guard-profile linux tests
+          /tmp/clean-env/bin/python -c \
+            "import json; d = json.load(open('manifest.json')); assert d['status'] == 'ok', d; assert d['identity']['selected'] == ['tests/test_ok.py::test_ok'], d"
+          /tmp/clean-env/bin/pytest-collection-guard compare manifest.json manifest.json

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Packaging and clean wheel installation CI job in `.github/workflows/ci.yml` verifying entry points and CLI commands in an isolated virtual environment.
+- The packaging CI job now also runs `pytest --collect-only` with the installed wheel and asserts the recorded manifest, so the `pytest11` entry point is tested from the built artifact rather than the source tree.
 - Regression tests in `tests/pytester/test_plugin_integration.py` covering empty test collection, failed collection reporting, and nested conftest proxy hook filtering.
 - Unit test in `tests/test_plugin_unit.py` verifying `_GuardRecorder` hashability and set operations.
 - Manifests from an aborted collection (`pytest.exit`, Ctrl-C, internal crash)
