@@ -24,7 +24,7 @@ historical example, not a claim about current pytest).
 Existing tools export collection/results as JSON
 ([pytest-json-report](https://github.com/numirias/pytest-json-report)) or show
 a re-collection diff interactively
-([pytest-deck](https://mchalela/pytest-deck)). This project is different: a
+([pytest-deck](https://github.com/mchalela/pytest-deck)). This project is different: a
 versioned baseline inventory, an environment profile, a **justified-removal
 list**, and a mandatory loss gate in CI. It never changes which tests run.
 

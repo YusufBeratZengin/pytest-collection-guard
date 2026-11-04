@@ -83,6 +83,7 @@ echo "== secret scan (dependency-free) =="
 # and generic credential variable assignments with literal strings).
 # This is an early repository sanity gate for local commits and CI; it does not
 # substitute for dedicated entropy-based secret scanning or commercial enterprise SAST tooling.
+set +e
 SECRET_HITS="$(grep -rInE \
   --exclude-dir=.git --exclude-dir=.mypy_cache --exclude-dir=.ruff_cache \
   --exclude-dir=.pytest_cache --exclude-dir=demo --exclude-dir='*egg-info' \
@@ -92,10 +93,17 @@ SECRET_HITS="$(grep -rInE \
   -e 'xox[baprs]-[A-Za-z0-9-]{10,}' \
   -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
   -e "(api[_-]?key|secret|token|passwd|password)[[:space:]]*[=:][[:space:]]*[\"'][^\"']{8,}[\"']" \
-  . || true)"
-if [ -n "$SECRET_HITS" ]; then
+  . 2>&1)"
+SCAN_STATUS=$?
+set -e
+
+if [ "$SCAN_STATUS" -eq 0 ]; then
   echo "$SECRET_HITS"
   echo "check.sh: possible secret(s) found — remove them (never commit credentials)" >&2
+  exit 1
+elif [ "$SCAN_STATUS" -ne 1 ]; then
+  echo "$SECRET_HITS" >&2
+  echo "check.sh: secret scan failed with execution error (exit status $SCAN_STATUS)" >&2
   exit 1
 fi
 echo "check.sh: secret scan clean"

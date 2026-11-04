@@ -16,6 +16,7 @@ htmlcov/
 coverage.xml
 .venv/
 venv/
+.probe*/
 
 # generated demo manifests
 demo/

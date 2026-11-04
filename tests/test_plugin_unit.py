@@ -61,6 +61,18 @@ def test_recorder_internal_errors_are_recorded() -> None:
     assert recorder.errors == ["internal error: example repr"]
 
 
+def test_recorder_is_hashable_and_usable_in_sets() -> None:
+    recorder = _GuardRecorder(out_path=Path("m.json"), profile="linux")
+    # Plugin instances registered in pluggy must be hashable because subset_hook_caller
+    # relies on set operations (intersection_update) across hook implementations.
+    assert hash(recorder) == hash(recorder)
+    plugin_set = {recorder}
+    assert recorder in plugin_set
+    removal_set = {recorder, "other"}
+    removal_set.intersection_update([recorder])
+    assert removal_set == {recorder}
+
+
 def test_relative_args_kept_as_given(tmp_path: Path) -> None:
     assert normalize_positional_args(["tests/unit", "tests/it"], tmp_path) == (
         "tests/unit",

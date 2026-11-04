@@ -167,7 +167,7 @@ def build_environment(config: pytest.Config, profile: str) -> Environment:
 # ---------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(eq=False)
 class _GuardRecorder:
     """Collects identity data during one pytest session and writes the manifest.
 

@@ -56,3 +56,31 @@ jobs:
 
       - name: Run the quality gate
         run: bash scripts/check.sh
+
+  packaging:
+    name: package & clean install (wheel + CLI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check --strict dist/*
+
+      - name: Clean install in fresh virtual environment
+        run: |
+          python -m venv /tmp/clean-env
+          /tmp/clean-env/bin/pip install dist/*.whl
+
+      - name: Run CLI demo and compare in clean environment
+        run: |
+          /tmp/clean-env/bin/pytest-collection-guard --version
+          /tmp/clean-env/bin/pytest-collection-guard --help
+          /tmp/clean-env/bin/pytest-collection-guard demo --dir /tmp/demo-clean
+          /tmp/clean-env/bin/pytest-collection-guard compare /tmp/demo-clean/baseline.json /tmp/demo-clean/baseline.json

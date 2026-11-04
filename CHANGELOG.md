@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Packaging and clean wheel installation CI job in `.github/workflows/ci.yml` verifying entry points and CLI commands in an isolated virtual environment.
+- Regression tests in `tests/pytester/test_plugin_integration.py` covering empty test collection, failed collection reporting, and nested conftest proxy hook filtering.
+- Unit test in `tests/test_plugin_unit.py` verifying `_GuardRecorder` hashability and set operations.
+
+### Fixed
+
+- Made `_GuardRecorder` hashable (`@dataclass(eq=False)`) so pluggy's `subset_hook_caller` and pytest's `FSHookProxy` can perform set operations without `TypeError: unhashable type: '_GuardRecorder'` on empty collections and multi-conftest trees.
+- Hardened secret scan in `scripts/check.sh` by distinguishing grep exit code 1 (no match) from execution errors (exit code >= 2), preventing masked scanner failures.
+- Fixed pytest-deck repository link in `README.md` and `README.tr.md`.
+
 - Snapshot `--ignore`, `--ignore-glob`, and `--deselect` options in collection arguments so scope changes produce exit code 2 (mismatch) rather than false test loss.
 - Atomic manifest writing via temporary file and `os.replace` to prevent corrupted inventories on interrupted runs.
 - Immediate CI failure on manifest write error (`INTERNAL_ERROR`) and invalidation of stale output files.

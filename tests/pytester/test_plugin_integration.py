@@ -359,3 +359,72 @@ def test_deselect_option_mismatch_refuses_comparison(
     save_manifest(c_path, curr)
 
     assert run_compare(b_path, c_path) == EXIT_MISMATCH
+
+
+# ---------------------------------------------------------------------------
+# empty and failed collection regression tests (plugin hashability & FSHookProxy)
+# ---------------------------------------------------------------------------
+
+
+def test_empty_collection_generates_valid_empty_manifest(
+    guard_run, read_manifest, pytester
+) -> None:
+    """An empty test directory must produce an empty manifest without internal plugin error."""
+    empty_dir = pytester.path / "empty_suite"
+    empty_dir.mkdir(parents=True, exist_ok=True)
+    (empty_dir / "conftest.py").write_text("# empty conftest\n", encoding="utf-8")
+
+    result = guard_run("empty_suite")
+    assert result.ret == pytest.ExitCode.NO_TESTS_COLLECTED
+    assert "INTERNALERROR" not in result.stderr.str()
+    assert "INTERNALERROR" not in result.stdout.str()
+
+    manifest = read_manifest()
+    assert manifest.status == "ok"
+    assert manifest.is_valid_inventory
+    assert manifest.selected == ()
+    assert manifest.deselected == ()
+    assert manifest.errors == ()
+
+
+def test_failed_collection_marks_manifest_invalid_without_plugin_crash(
+    guard_run, read_manifest, write_test_file
+) -> None:
+    """A collection failure in a test file must record status='error' and no internal crash."""
+    write_test_file(
+        "tests/test_failing_collect.py",
+        "raise RuntimeError('synthetic collection failure')\n",
+    )
+
+    result = guard_run("tests")
+    assert result.ret != 0
+    assert "INTERNALERROR" not in result.stderr.str()
+    assert "INTERNALERROR" not in result.stdout.str()
+
+    manifest = read_manifest()
+    assert manifest.status == "error"
+    assert not manifest.is_valid_inventory
+    assert manifest.errors
+    assert any("synthetic collection failure" in err for err in manifest.errors)
+
+
+def test_nested_conftest_collection_with_hook_proxy_filtering(
+    guard_run, read_manifest, pytester
+) -> None:
+    """Nested conftests activate pytest's FSHookProxy which requires plugins to be hashable."""
+    root_conftest = pytester.path / "conftest.py"
+    root_conftest.write_text("# root conftest\n", encoding="utf-8")
+
+    pkg_dir = pytester.path / "pkg"
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "conftest.py").write_text("# sub conftest\n", encoding="utf-8")
+    (pkg_dir / "test_pkg.py").write_text("def test_item(): pass\n", encoding="utf-8")
+
+    result = guard_run("pkg")
+    assert result.ret == pytest.ExitCode.OK
+    assert "INTERNALERROR" not in result.stderr.str()
+
+    manifest = read_manifest()
+    assert manifest.status == "ok"
+    assert manifest.is_valid_inventory
+    assert "pkg/test_pkg.py::test_item" in manifest.selected

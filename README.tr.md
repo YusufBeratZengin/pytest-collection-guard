@@ -11,7 +11,7 @@ Pytest'in topladığı (keşfettiği) test kimliklerini sürümler arasında kar
 
 Pytest keşfi yapılandırmaya bağlıdır: `testpaths`, `norecursedirs` ve dosya/sınıf/fonksiyon adlandırma kuralları hangi testlerin toplanacağını belirler ([resmî keşif kuralları](https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery)). Yapılandırma değişikliği toplanan test kümesini sessizce değiştirebilir; bazı dekoratör düzenleri tarihsel olarak testleri keşiften tamamen gizlemiştir ([pytest issue #10525](https://github.com/pytest-dev/pytest/issues/10525) — tarihsel bir örnek; bugünün pytest sürümü hakkında bir iddia değildir).
 
-Mevcut araçlar toplama/sonuç verisini JSON'a aktarır ([pytest-json-report](https://github.com/numirias/pytest-json-report)) veya yeniden toplama farkını etkileşimli gösterir ([pytest-deck](https://mchalela/pytest-deck)). Bu projenin somut farkı: sürümlenmiş baz envanter, ortam profili, **gerekçeli kaldırma listesi** ve CI'da zorunlu kayıp denetimi. Hangi testlerin çalıştırılacağını asla değiştirmez.
+Mevcut araçlar toplama/sonuç verisini JSON'a aktarır ([pytest-json-report](https://github.com/numirias/pytest-json-report)) veya yeniden toplama farkını etkileşimli gösterir ([pytest-deck](https://github.com/mchalela/pytest-deck)). Bu projenin somut farkı: sürümlenmiş baz envanter, ortam profili, **gerekçeli kaldırma listesi** ve CI'da zorunlu kayıp denetimi. Hangi testlerin çalıştırılacağını asla değiştirmez.
 
 ## Kurulum
 
