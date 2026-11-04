@@ -17,13 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plugin tracks `pytest_collection_finish`, so an inventory that was never
   completed cannot be compared as if it were whole. The terminal summary now
   prints `inventory NOT usable for compare` with the first reason.
+- `pytest-collection-guard --version` prints the tool version; the packaging
+  CI job already invoked it, so the flag now exists and is tested.
 
 ### Fixed
 
 - Made `_GuardRecorder` hashable (`@dataclass(eq=False)`) so pluggy's `subset_hook_caller` and pytest's `FSHookProxy` can perform set operations without `TypeError: unhashable type: '_GuardRecorder'` on empty collections and multi-conftest trees.
 - Hardened secret scan in `scripts/check.sh` by distinguishing grep exit code 1 (no match) from execution errors (exit code >= 2), preventing masked scanner failures.
 - Fixed pytest-deck repository link in `README.md` and `README.tr.md`.
-
+- `compare --json PATH` write failures are reported on stderr and exit `2`
+  instead of raising a traceback.
 - Snapshot `--ignore`, `--ignore-glob`, and `--deselect` options in collection arguments so scope changes produce exit code 2 (mismatch) rather than false test loss.
 - Atomic manifest writing via temporary file and `os.replace` to prevent corrupted inventories on interrupted runs.
 - Immediate CI failure on manifest write error (`INTERNAL_ERROR`) and invalidation of stale output files.

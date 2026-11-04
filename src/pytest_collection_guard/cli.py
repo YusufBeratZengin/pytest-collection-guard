@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
+from pytest_collection_guard import __version__
 from pytest_collection_guard.diff import ManifestDiff, compare_manifests
 from pytest_collection_guard.manifest import (
     STATUS_OK,
@@ -207,8 +208,12 @@ def run_compare(
 
     if json_out is not None:
         payload = _json_result(baseline, current, diff, decision, exit_code)
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        try:
+            json_out.parent.mkdir(parents=True, exist_ok=True)
+            json_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"{_PROG}: error: cannot write JSON report {json_out}: {exc}", file=stderr)
+            return EXIT_MISMATCH
 
     return exit_code
 
@@ -291,6 +296,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=_PROG,
         description="Fail CI when expected pytest tests disappear from collection.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="print the tool version and exit",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

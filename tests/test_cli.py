@@ -6,6 +6,9 @@ import io
 import json
 from pathlib import Path
 
+import pytest
+
+from pytest_collection_guard import __version__
 from pytest_collection_guard.cli import (
     EXIT_MISMATCH,
     EXIT_OK,
@@ -347,3 +350,26 @@ def test_package_main_module_runs_in_process(tmp_path: Path, monkeypatch) -> Non
     assert run() == EXIT_OK
     assert (demo_dir / "baseline.json").is_file()
     assert (demo_dir / "current.json").is_file()
+
+
+def test_json_report_write_failure_returns_exit_2(
+    make_manifest, write_manifest, tmp_path: Path, capsys
+) -> None:
+    """An unwritable --json target is an input error (2), never a silent success."""
+    baseline = write_manifest(make_manifest(), "b.json")
+    current = write_manifest(make_manifest(), "c.json")
+    blocker = tmp_path / "blocker"
+    blocker.write_text("this is a file, not a directory", encoding="utf-8")
+
+    code = run_compare(baseline, current, json_out=blocker / "result.json")
+
+    assert code == EXIT_MISMATCH
+    assert "cannot write JSON report" in capsys.readouterr().err
+
+
+def test_version_flag_prints_version_and_exits_zero(capsys) -> None:
+    """`--version` must work without a subcommand (used by packaging CI)."""
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--version"])
+    assert excinfo.value.code == 0
+    assert capsys.readouterr().out.strip() == f"pytest-collection-guard {__version__}"
