@@ -58,8 +58,15 @@ jobs:
         run: bash scripts/check.sh
 
   packaging:
-    name: package & clean install (wheel + CLI)
-    runs-on: ubuntu-latest
+    name: package & clean install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      # venv layout differs per platform; keep every path in one place.
+      VENV_BIN: ${{ matrix.os == 'windows-latest' && '.clean-env/Scripts' || '.clean-env/bin' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,30 +75,41 @@ jobs:
           python-version: "3.12"
 
       - name: Build sdist and wheel
+        shell: bash
         run: |
           python -m pip install --upgrade build twine
           python -m build
           python -m twine check --strict dist/*
 
       - name: Clean install in fresh virtual environment
+        shell: bash
         run: |
-          python -m venv /tmp/clean-env
-          /tmp/clean-env/bin/pip install dist/*.whl
+          python -m venv .clean-env
+          "$VENV_BIN/pip" install dist/*.whl
 
       - name: Run CLI demo and compare in clean environment
+        shell: bash
         run: |
-          /tmp/clean-env/bin/pytest-collection-guard --version
-          /tmp/clean-env/bin/pytest-collection-guard --help
-          /tmp/clean-env/bin/pytest-collection-guard demo --dir /tmp/demo-clean
-          /tmp/clean-env/bin/pytest-collection-guard compare /tmp/demo-clean/baseline.json /tmp/demo-clean/baseline.json
+          "$VENV_BIN/pytest-collection-guard" --version
+          "$VENV_BIN/pytest-collection-guard" --help
+          "$VENV_BIN/pytest-collection-guard" demo --dir demo-clean
+          "$VENV_BIN/pytest-collection-guard" compare demo-clean/baseline.json demo-clean/baseline.json
 
       - name: Verify the pytest11 entry point loaded from the wheel
+        shell: bash
         run: |
-          mkdir -p /tmp/entrypoint/tests
-          printf 'def test_ok():\n    assert True\n' > /tmp/entrypoint/tests/test_ok.py
-          cd /tmp/entrypoint
-          /tmp/clean-env/bin/pytest --collect-only -q \
+          VENV_DIR="$PWD/$VENV_BIN"
+          if command -v cygpath >/dev/null 2>&1; then
+            VENV_DIR="$(cygpath -m "$VENV_DIR")"
+          fi
+          # Outside the checkout: the repo's own pyproject.toml disables this
+          # plugin (-p no:collection_guard) and would mask a broken entry point.
+          WORK="$(mktemp -d)"
+          cd "$WORK"
+          mkdir -p tests
+          printf 'def test_ok():\n    assert True\n' > tests/test_ok.py
+          "$VENV_DIR/pytest" --collect-only -q \
             --collection-guard-out manifest.json --collection-guard-profile linux tests
-          /tmp/clean-env/bin/python -c \
+          "$VENV_DIR/python" -c \
             "import json; d = json.load(open('manifest.json')); assert d['status'] == 'ok', d; assert d['identity']['selected'] == ['tests/test_ok.py::test_ok'], d"
-          /tmp/clean-env/bin/pytest-collection-guard compare manifest.json manifest.json
+          "$VENV_DIR/pytest-collection-guard" compare manifest.json manifest.json
