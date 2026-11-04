@@ -32,6 +32,8 @@ list**, and a mandatory loss gate in CI. It never changes which tests run.
 
 ```console
 $ python -m pip install .
+$ pytest-collection-guard --version
+pytest-collection-guard 0.1.0
 ```
 
 Runtime dependencies: **pytest only** (this is a pytest plugin; the CLI half
@@ -193,6 +195,11 @@ A manifest strictly separates two kinds of data:
 - **A collection error produces no valid inventory**: the manifest is written
   with `"status": "error"` and `compare` refuses it (exit `2`). A partial
   collection can never masquerade as lost tests.
+- **An aborted collection is invalid too**: if the session exits before
+  collection finishes (`pytest.exit`, Ctrl-C, an internal crash), no
+  `pytest_collection_finish` happens and the manifest is still written with
+  `"status": "error"` — even when pytest's own exit code is `0`. The terminal
+  summary then prints `inventory NOT usable for compare` with the reason.
 - **The guard never changes test selection** — it only observes collection.
 - **The baseline is never auto-updated** by CI; refreshing it is a reviewed,
   human decision.

@@ -11,10 +11,11 @@ bodies and fixtures never run during a ``--collect-only`` run — but collection
 itself **imports your test modules** (and their ``conftest.py`` files), so
 module-level import side effects do execute. Keep test modules import-safe.
 
-Integrity rule: if collection fails (broken import, syntax error, ...), the
-run did not see the real test set. The manifest is then written with
-``status: "error"`` and the ``compare`` command refuses to use it as an
-inventory — a partial collection can never masquerade as lost tests.
+Integrity rule: if collection fails (broken import, syntax error, ...) or
+never finishes (``pytest.exit``, Ctrl-C, an internal crash), the run did not
+see the real test set. The manifest is then written with ``status: "error"``
+and the ``compare`` command refuses to use it as an inventory — a partial
+collection can never masquerade as lost tests.
 """
 
 from __future__ import annotations
@@ -180,6 +181,7 @@ class _GuardRecorder:
     profile: str
     collected: tuple[str, ...] = ()
     errors: list[str] = field(default_factory=list)
+    collection_finished: bool = False
     written: Path | None = None
     write_error: str | None = None
 
@@ -200,6 +202,12 @@ class _GuardRecorder:
         detail = str(longrepr) if longrepr is not None else "unknown collection error"
         self.errors.append(f"{report.nodeid}: {detail}"[:2000])
 
+    def pytest_collection_finish(self, session: pytest.Session) -> None:
+        # Reaching this hook proves collection completed (per-file failures are
+        # recorded separately by pytest_collectreport). A session aborted in
+        # the middle of collection never gets here, so its item list is partial.
+        self.collection_finished = True
+
     def pytest_internalerror(self, excrepr: Any, excinfo: Any) -> None:
         self.errors.append(f"internal error: {excrepr}")
 
@@ -218,6 +226,11 @@ class _GuardRecorder:
                 f"collection-guard: manifest written to {self.written} "
                 f"(status: {status}, {len(self.collected)} collected node id(s))"
             )
+            if self.errors:
+                first_line = self.errors[0].strip().splitlines()[0][:200]
+                terminalreporter.write_line(
+                    f"collection-guard: inventory NOT usable for compare — {first_line}"
+                )
         if self.write_error is not None:
             terminalreporter.write_line(
                 f"collection-guard: FAILED to write manifest: {self.write_error}"
@@ -229,6 +242,11 @@ class _GuardRecorder:
         selected_ids = tuple(sorted({item.nodeid for item in session.items}))
         collected_ids = set(self.collected) or set(selected_ids)
         deselected_ids = tuple(sorted(collected_ids - set(selected_ids)))
+        if not self.collection_finished:
+            self.errors.append(
+                "collection did not finish (pytest aborted before collection "
+                "completed); the inventory is incomplete"
+            )
         status = STATUS_ERROR if self.errors else STATUS_OK
         manifest = Manifest(
             selected=selected_ids,

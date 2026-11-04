@@ -17,6 +17,8 @@ Mevcut araçlar toplama/sonuç verisini JSON'a aktarır ([pytest-json-report](ht
 
 ```console
 $ python -m pip install .
+$ pytest-collection-guard --version
+pytest-collection-guard 0.1.0
 ```
 
 Çalışma zamanı bağımlılığı: **yalnızca pytest** (bu bir pytest eklentisi; CLI yarısı yalnızca standart kütüphaneyi kullanır — `argparse`, `json`, `pathlib`, `platform`, `tomllib`). Geliştirme araçları (`ruff`, `mypy`, `pytest-cov`) `dev` eklentisiyle gelir.
@@ -148,6 +150,7 @@ Manifest, iki tür veriyi kesinlikle ayırır:
 - `--collect-only` toplamasında **test gövdeleri ve fixture'lar asla çalışmaz**.
 - **Toplama, test modüllerinizi (ve `conftest.py`) import eder**; bu yüzden modül düzeyindeki yan etkiler çalışır. Test modüllerini import-safe tutun.
 - **Toplama hatası geçerli envanter üretmez**: manifest `"status": "error"` ile yazılır ve `compare` onu reddeder (`2`). Yarım bir toplama asla "testler kayboldu" şeklinde davranamaz.
+- **Yarıda kesilen toplama da geçersizdir**: oturum toplama bitmeden sonlanırsa (`pytest.exit`, Ctrl-C, iç hata) `pytest_collection_finish` hiç çalışmaz; manifest yine de `"status": "error"` ile yazılır — pytest'in kendi çıkış kodu `0` olsa bile. Terminal özeti nedeniyle birlikte `inventory NOT usable for compare` satırını basar.
 - **Guard test seçimini asla değiştirmez** — yalnızca toplamayı gözlemler.
 - **Baz CI tarafından otomatik güncellenmez**; tazelemek incelenmiş, insan kararıdır.
 - Platform, Python ve pytest sürümleri kaydedilir ama zorlanmaz; envanterler arası farka bakmak yerine **profil başına** bir baz kullanın.

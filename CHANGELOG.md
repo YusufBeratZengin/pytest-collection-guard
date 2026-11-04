@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Packaging and clean wheel installation CI job in `.github/workflows/ci.yml` verifying entry points and CLI commands in an isolated virtual environment.
 - Regression tests in `tests/pytester/test_plugin_integration.py` covering empty test collection, failed collection reporting, and nested conftest proxy hook filtering.
 - Unit test in `tests/test_plugin_unit.py` verifying `_GuardRecorder` hashability and set operations.
+- Manifests from an aborted collection (`pytest.exit`, Ctrl-C, internal crash)
+  are marked `"status": "error"` even when pytest's own exit code is `0`: the
+  plugin tracks `pytest_collection_finish`, so an inventory that was never
+  completed cannot be compared as if it were whole. The terminal summary now
+  prints `inventory NOT usable for compare` with the first reason.
 
 ### Fixed
 

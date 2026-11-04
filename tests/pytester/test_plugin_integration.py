@@ -428,3 +428,28 @@ def test_nested_conftest_collection_with_hook_proxy_filtering(
     assert manifest.status == "ok"
     assert manifest.is_valid_inventory
     assert "pkg/test_pkg.py::test_item" in manifest.selected
+
+
+def test_aborted_collection_manifest_is_not_a_valid_inventory(
+    guard_run, read_manifest, write_test_file, pytester
+) -> None:
+    """A session that exits before collection finishes must not emit a valid inventory."""
+    (pytester.path / "conftest.py").write_text(
+        "import pytest\n"
+        "\n"
+        "\n"
+        "def pytest_collection(session):\n"
+        "    pytest.exit('synthetic abort before collection completes', returncode=0)\n",
+        encoding="utf-8",
+    )
+    write_test_file("tests/test_alpha.py", "def test_one():\n    assert True\n")
+
+    result = guard_run("tests")
+    assert result.ret == pytest.ExitCode.OK
+    assert "inventory NOT usable for compare" in result.stdout.str()
+
+    manifest = read_manifest()
+    assert manifest.status == "error"
+    assert not manifest.is_valid_inventory
+    assert manifest.selected == ()
+    assert any("collection did not finish" in err for err in manifest.errors)
