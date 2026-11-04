@@ -46,4 +46,4 @@ The repository quality gate (`scripts/check.sh`) performs a dependency-free heur
 - PEM private key blocks (`BEGIN PRIVATE KEY`)
 - Common credential assignment statements with hard-coded values
 
-A "clean" scan result confirms that none of these predefined credential signatures were detected in repository files. It serves as a fast pre-commit sanity check and does not replace deep entropy-based scanning or full enterprise SAST tooling.
+A "clean" scan result confirms that none of these predefined credential signatures were detected in repository files. The scan covers the whole working tree — including `demo/`, `examples/` and `docs/` — and skips only VCS metadata, tool caches and generated build artifacts. It serves as a fast pre-commit sanity check and does not replace deep entropy-based scanning or full enterprise SAST tooling.

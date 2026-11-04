@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed pytest-deck repository link in `README.md` and `README.tr.md`.
 - `compare --json PATH` write failures are reported on stderr and exit `2`
   instead of raising a traceback.
+- The secret scan now covers `demo/`, `examples/` and `docs/`; the earlier
+  `--exclude-dir=demo` left a blind spot. Only VCS metadata, tool caches and
+  generated build artifacts are skipped (documented in `SECURITY.md`).
 - Snapshot `--ignore`, `--ignore-glob`, and `--deselect` options in collection arguments so scope changes produce exit code 2 (mismatch) rather than false test loss.
 - Atomic manifest writing via temporary file and `os.replace` to prevent corrupted inventories on interrupted runs.
 - Immediate CI failure on manifest write error (`INTERNAL_ERROR`) and invalidation of stale output files.

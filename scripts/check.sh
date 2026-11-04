@@ -81,12 +81,15 @@ echo "== secret scan (dependency-free) =="
 # Scope and boundaries: dependency-free heuristic regex scan targeting common
 # credential types (AWS key IDs, GitHub PATs, Slack tokens, PEM private key blocks,
 # and generic credential variable assignments with literal strings).
+# The whole working tree is scanned (demo/, examples/ and docs/ included);
+# only VCS metadata, tool caches and generated build artifacts are skipped.
 # This is an early repository sanity gate for local commits and CI; it does not
 # substitute for dedicated entropy-based secret scanning or commercial enterprise SAST tooling.
 set +e
 SECRET_HITS="$(grep -rInE \
   --exclude-dir=.git --exclude-dir=.mypy_cache --exclude-dir=.ruff_cache \
-  --exclude-dir=.pytest_cache --exclude-dir=demo --exclude-dir='*egg-info' \
+  --exclude-dir=.pytest_cache --exclude-dir=build --exclude-dir=dist \
+  --exclude-dir='*egg-info' \
   -I \
   -e 'AKIA[0-9A-Z]{16}' \
   -e 'ghp_[A-Za-z0-9]{36}' \
