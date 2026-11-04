@@ -138,7 +138,7 @@ Manifest, iki tür veriyi kesinlikle ayırır:
 
 ### İzlenen ayarlar ve karşılaştırma sınırları
 
-- **İzlenen toplama ayarları**: `testpaths`, `norecursedirs`, `python_files`, `python_classes`, `python_functions`, konumsal argümanlar, `-k`, `-m`, `--ignore`, `--ignore-glob` veya `--deselect` seçeneklerindeki herhangi bir fark, `compare` komutunun sahte test kaybı raporlamak yerine karşılaştırmayı reddetmesini (çıkış kodu `2`) sağlar.
+- **İzlenen toplama ayarları**: `testpaths`, `norecursedirs`, `python_files`, `python_classes`, `python_functions`, konumsal argümanlar, `-k`, `-m`, `--ignore`, `--ignore-glob` veya `--deselect` seçeneklerindeki herhangi bir fark, `compare` komutunun sahte test kaybı raporlamak yerine karşılaştırmayı reddetmesini (çıkış kodu `2`) sağlar. `pytest-collection-guard compare --help` aynı izlenen/izlenmeyen listeyi basar; böylece sözleşme, kapının kurulduğu yerde görünür olur.
 - **Atomik manifest yazımı**: manifestler önce geçici dosyaya yazılır ve `os.replace` ile atomik olarak hedefle değiştirilir. Yazma başarısız olursa eski çıktı dosyası geçersiz kılınır ve pytest sıfır dışı (`INTERNAL_ERROR`) kodla sonlanır; böylece CI adımları yanlışlıkla eski envanteri karşılaştıramaz.
 - **Kaydedilmeyen ayarlar ve karşılaştırma sınırları**:
   - *Dinamik çalışma zamanı koşulları*: kod içi kontroller (ör. `if sys.platform == "win32"` veya harici veritabanından/ortam değişkenlerinden beslenen dinamik test üreteçleri) pytest CLI/ini ayarlarını değiştirmeden toplamayı etkiler. Farklı ortamlar için ayrı `--collection-guard-profile` değerleri (ör. `linux`, `windows`) ve profil başına bağımsız baz dosyaları kullanın.

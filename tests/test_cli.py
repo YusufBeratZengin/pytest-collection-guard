@@ -373,3 +373,22 @@ def test_version_flag_prints_version_and_exits_zero(capsys) -> None:
         main(["--version"])
     assert excinfo.value.code == 0
     assert capsys.readouterr().out.strip() == f"pytest-collection-guard {__version__}"
+
+
+def test_compare_help_documents_tracked_settings_and_limits(capsys) -> None:
+    """`compare --help` must state what is compared and what is out of scope.
+
+    Users read exit 2 (or a clean result) as stronger than it is unless the
+    help names both the tracked settings and the untracked ones.
+    """
+    with pytest.raises(SystemExit) as excinfo:
+        main(["compare", "--help"])
+    assert excinfo.value.code == 0
+    out = capsys.readouterr().out
+    for setting in ("testpaths", "norecursedirs", "python_files", "positional arguments"):
+        assert setting in out
+    assert "--ignore-glob" in out
+    assert "--deselect" in out
+    assert "Not tracked" in out
+    assert "third-party" in out
+    assert "--collection-guard-profile" in out

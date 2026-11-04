@@ -47,6 +47,20 @@ EXIT_MISMATCH = 2
 
 _PROG = "pytest-collection-guard"
 
+# Shown in ``compare --help``: the scope of the comparability check, including
+# what is deliberately *not* tracked, so users do not read exit 2 (or a clean
+# result) as broader than it is.
+_TRACKED_SETTINGS_NOTE = (
+    "Tracked collection settings: a difference in testpaths, norecursedirs, "
+    "python_files, python_classes, python_functions, positional arguments, "
+    "-k, -m, --ignore, --ignore-glob or --deselect makes compare exit 2 "
+    "instead of reporting fake losses. Not tracked: flags from third-party "
+    "plugins that filter collection and dynamic, code-level test generation "
+    "(platform checks, external data). Those can change the test set without "
+    "changing any recorded setting; use one --collection-guard-profile per "
+    "environment and keep a separate baseline for each."
+)
+
 
 # ---------------------------------------------------------------------------
 # compare
@@ -313,6 +327,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "1 = unapproved removal(s), 2 = comparison refused (profile/argument "
             "mismatch, errored collection manifest, or invalid input)."
         ),
+        epilog=_TRACKED_SETTINGS_NOTE,
     )
     compare.add_argument("baseline", type=Path, help="baseline manifest JSON")
     compare.add_argument("current", type=Path, help="current manifest JSON")

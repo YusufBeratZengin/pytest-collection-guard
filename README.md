@@ -173,6 +173,8 @@ A manifest strictly separates two kinds of data:
   `python_files`, `python_classes`, `python_functions`, positional arguments,
   `-k`, `-m`, `--ignore`, `--ignore-glob`, or `--deselect` causes `compare` to
   refuse the comparison (exit code `2`) rather than false-reporting lost tests.
+  `pytest-collection-guard compare --help` prints the same tracked/untracked
+  list, so the contract is visible where the gate is wired up.
 - **Atomic manifest writing**: manifests are written to a temporary file and
   atomically swapped via `os.replace`. If writing fails, any existing stale output
   file is invalidated and pytest exits non-zero (`INTERNAL_ERROR`), ensuring CI
