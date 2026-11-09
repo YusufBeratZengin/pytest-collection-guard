@@ -620,6 +620,30 @@ def test_keyboardinterrupt_during_collection_rejects_partial_inventory(
     assert "REMOVED" not in report.getvalue()
 
 
+def test_usage_error_during_collection_rejects_partial_inventory(
+    guard_run, read_manifest, write_test_file, pytester
+) -> None:
+    for name in ("alpha", "zulu"):
+        write_test_file(f"tests/test_{name}.py", "def test_one():\n    assert True\n")
+    write_test_file(
+        "tests/test_middle.py",
+        "import pytest\nraise pytest.UsageError('synthetic usage error')\n",
+    )
+    result = pytester.runpytest(
+        "--collect-only",
+        "-q",
+        "-p",
+        "pytest_collection_guard.plugin",
+        "--collection-guard-profile=linux",
+        "--collection-guard-out=current.json",
+    )
+    current = read_manifest("current.json")
+    assert result.ret != pytest.ExitCode.OK
+    assert current.status == "error"
+    assert not current.is_valid_inventory
+    assert "inventory NOT usable for compare" in result.stdout.str()
+
+
 def test_keyboardinterrupt_in_test_body_keeps_inventory_valid(
     guard_run, read_manifest, write_test_file, pytester
 ) -> None:

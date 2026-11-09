@@ -238,9 +238,9 @@ class _GuardRecorder:
         # block when collection aborts, so observe the collection outcome too.
         outcome = yield
         excinfo = getattr(outcome, "excinfo", None)
-        if excinfo is not None and issubclass(
-            excinfo[0], (KeyboardInterrupt, pytest.exit.Exception)
-        ):
+        if excinfo is not None:
+            # Any exception that escapes collection (UsageError, Failed,
+            # KeyboardInterrupt, pytest.exit, ...) leaves a partial inventory.
             self.collection_interrupted = True
 
     def pytest_collection_finish(self, session: pytest.Session) -> None:
