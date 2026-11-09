@@ -11,11 +11,12 @@ These exercise the acceptance criteria end to end:
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pytest
 
-from pytest_collection_guard.cli import EXIT_MISMATCH, EXIT_REMOVALS, run_compare
+from pytest_collection_guard.cli import EXIT_MISMATCH, EXIT_OK, EXIT_REMOVALS, run_compare
 from pytest_collection_guard.manifest import save_manifest
 
 # ---------------------------------------------------------------------------
@@ -453,3 +454,231 @@ def test_aborted_collection_manifest_is_not_a_valid_inventory(
     assert not manifest.is_valid_inventory
     assert manifest.selected == ()
     assert any("collection did not finish" in err for err in manifest.errors)
+
+
+@pytest.mark.parametrize("returncode", [None, 0])
+@pytest.mark.parametrize("direct_exception", [False, True], ids=["pytest-exit", "exit-exception"])
+def test_exit_from_collectstart_rejects_partial_inventory(
+    guard_run,
+    read_manifest,
+    write_test_file,
+    pytester: pytest.Pytester,
+    returncode: int | None,
+    direct_exception: bool,
+) -> None:
+    """The finish hook runs even when pytest.exit aborts the tree halfway."""
+    pytester.makeini("[pytest]")
+    for name in ("alpha", "middle", "zulu"):
+        write_test_file(f"tests/test_{name}.py", "def test_one():\n    assert True\n")
+    guard_run(out="baseline.json")
+    baseline = read_manifest("baseline.json")
+    assert baseline.status == "ok"
+    assert len(baseline.selected) == 3
+
+    abort = (
+        "raise pytest.exit.Exception" if direct_exception else "pytest.exit"
+    ) + f"('synthetic abort', returncode={returncode!r})"
+    write_test_file(
+        "conftest.py",
+        "import pytest\n\n"
+        "def pytest_collectstart(collector):\n"
+        "    if collector.name == 'test_middle.py':\n"
+        f"        {abort}\n",
+    )
+    result = guard_run(out="current.json")
+    assert result.ret == (pytest.ExitCode.INTERRUPTED if returncode is None else 0)
+    assert "inventory NOT usable for compare" in result.stdout.str()
+    current = read_manifest("current.json")
+    assert current.selected == ("tests/test_alpha.py::test_one",)
+
+    report = io.StringIO()
+    code = run_compare(
+        pytester.path / "baseline.json", pytester.path / "current.json", stdout=report
+    )
+    assert (current.status, code) == ("error", EXIT_MISMATCH)
+    assert not current.is_valid_inventory
+    assert current.errors
+    assert "REMOVED" not in report.getvalue()
+
+
+def test_relative_ignore_same_scope_from_different_cwds_compares_cleanly(
+    guard_run,
+    read_manifest,
+    write_test_file,
+    pytester: pytest.Pytester,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The same ignored tree typed relative to two cwds is one identity.
+
+    Before the fix the raw strings ("tests/slow" vs "slow") were stored, so
+    two runs with identical scope were refused as a mismatch. Now both resolve
+    to the same rootdir-relative path and compare as equal with no loss.
+    """
+    for relpath, content in _SIMPLE_TREE.items():
+        write_test_file(relpath, content)
+    write_test_file("tests/slow/test_slow.py", "def test_slow():\n    assert True\n")
+    root = pytester.path
+
+    # baseline: run from the project root, ignore path relative to root
+    guard_run("tests", "--ignore=tests/slow", out=str(root / "baseline.json"))
+    # current: run from tests/, ignore path relative to tests/
+    monkeypatch.chdir(root / "tests")
+    guard_run(
+        str(root / "tests"),
+        "--rootdir",
+        str(root),
+        "--ignore=slow",
+        out=str(root / "current.json"),
+    )
+    monkeypatch.chdir(root)
+
+    baseline = read_manifest("baseline.json")
+    current = read_manifest("current.json")
+
+    report = io.StringIO()
+    code = run_compare(root / "baseline.json", root / "current.json", stdout=report)
+    assert code == EXIT_OK
+    assert "REMOVED" not in report.getvalue()
+    assert baseline.collection_args.ignore == ("tests/slow",)
+    assert current.collection_args.ignore == ("tests/slow",)
+    assert baseline.selected == current.selected
+
+
+def test_relative_ignore_real_scope_difference_is_refused(
+    guard_run,
+    read_manifest,
+    write_test_file,
+    pytester: pytest.Pytester,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The same literal string from another cwd can ignore a different path.
+
+    Before the fix both runs stored ("tests/slow",) and the 2 tests that the
+    second run never ignored were reported as fake REMOVED with exit 1. The
+    resolved locations now differ, so the comparison is refused (exit 2).
+    """
+    for relpath, content in _SIMPLE_TREE.items():
+        write_test_file(relpath, content)
+    write_test_file("tests/slow/test_slow.py", "def test_slow():\n    assert True\n")
+    root = pytester.path
+
+    # from tests/, "tests/slow" resolves to tests/tests/slow -> ignores nothing
+    monkeypatch.chdir(root / "tests")
+    guard_run(
+        str(root / "tests"),
+        "--rootdir",
+        str(root),
+        "--ignore=tests/slow",
+        out=str(root / "baseline.json"),
+    )
+    monkeypatch.chdir(root)
+    # from the root, the same string really ignores tests/slow
+    guard_run("tests", "--ignore=tests/slow", out=str(root / "current.json"))
+
+    baseline = read_manifest("baseline.json")
+    current = read_manifest("current.json")
+
+    report = io.StringIO()
+    code = run_compare(root / "baseline.json", root / "current.json", stdout=report)
+    assert code == EXIT_MISMATCH
+    assert "ignore differ" in report.getvalue()
+    assert "MISMATCH (not comparable)" in report.getvalue()
+    # Before the fix this comparison instead reported the 2 currently
+    # collected tests as fake REMOVED with exit 1 (both stored ("tests/slow",)).
+    assert baseline.collection_args.ignore == ("tests/tests/slow",)
+    assert current.collection_args.ignore == ("tests/slow",)
+    assert len(baseline.selected) > len(current.selected)
+
+
+def test_keyboardinterrupt_during_collection_rejects_partial_inventory(
+    guard_run, read_manifest, write_test_file, pytester
+) -> None:
+    for name in ("alpha", "zulu"):
+        write_test_file(f"tests/test_{name}.py", "def test_one():\n    assert True\n")
+    guard_run(out="baseline.json")
+    write_test_file("tests/test_middle.py", "raise KeyboardInterrupt('synthetic abort')\n")
+    result = pytester.runpytest(
+        "--collect-only",
+        "-q",
+        "-p",
+        "pytest_collection_guard.plugin",
+        "--collection-guard-profile=linux",
+        "--collection-guard-out=current.json",
+        no_reraise_ctrlc=True,
+    )
+    assert result.ret == pytest.ExitCode.INTERRUPTED
+    current = read_manifest("current.json")
+    assert current.status == "error"
+    assert not current.is_valid_inventory
+    assert "tests/test_zulu.py::test_one" not in current.selected
+    assert "inventory NOT usable for compare" in result.stdout.str()
+    report = io.StringIO()
+    assert (
+        run_compare(pytester.path / "baseline.json", pytester.path / "current.json", stdout=report)
+        == EXIT_MISMATCH
+    )
+    assert "REMOVED" not in report.getvalue()
+
+
+def test_usage_error_during_collection_rejects_partial_inventory(
+    guard_run, read_manifest, write_test_file, pytester
+) -> None:
+    for name in ("alpha", "zulu"):
+        write_test_file(f"tests/test_{name}.py", "def test_one():\n    assert True\n")
+    pytester.makeconftest(
+        "import pytest\n"
+        "\n"
+        "\n"
+        "def pytest_collectstart(collector):\n"
+        "    if collector.nodeid.endswith('test_zulu.py'):\n"
+        "        raise pytest.UsageError('synthetic usage error')\n"
+    )
+    result = pytester.runpytest(
+        "--collect-only",
+        "-q",
+        "-p",
+        "pytest_collection_guard.plugin",
+        "--collection-guard-profile=linux",
+        "--collection-guard-out=current.json",
+    )
+    current = read_manifest("current.json")
+    assert result.ret != pytest.ExitCode.OK
+    assert current.status == "error"
+    assert not current.is_valid_inventory
+    assert "inventory NOT usable for compare" in result.stdout.str()
+
+
+def test_keyboardinterrupt_in_test_body_keeps_inventory_valid(
+    guard_run, read_manifest, write_test_file, pytester
+) -> None:
+    """A test-body interrupt leaves the completed collection inventory usable."""
+    write_test_file(
+        "tests/test_body_interrupt.py",
+        "def test_one():\n    assert True\n\n"
+        "def test_two():\n    raise KeyboardInterrupt('synthetic test-body interrupt')\n",
+    )
+    guard_run(out="baseline.json")
+    baseline = read_manifest("baseline.json")
+    assert baseline.status == "ok"
+    assert len(baseline.selected) == 2
+    result = pytester.runpytest(
+        "-q",
+        "-p",
+        "pytest_collection_guard.plugin",
+        "--collection-guard-profile=linux",
+        "--collection-guard-out=current.json",
+        no_reraise_ctrlc=True,
+    )
+    assert result.ret == pytest.ExitCode.INTERRUPTED
+    current = read_manifest("current.json")
+    assert current.status == "ok"
+    assert current.is_valid_inventory
+    assert current.errors == ()
+    assert current.selected == baseline.selected
+    assert "inventory NOT usable for compare" not in result.stdout.str()
+    report = io.StringIO()
+    assert (
+        run_compare(pytester.path / "baseline.json", pytester.path / "current.json", stdout=report)
+        == EXIT_OK
+    )
+    assert "REMOVED" not in report.getvalue()
