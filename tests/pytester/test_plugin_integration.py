@@ -625,9 +625,13 @@ def test_usage_error_during_collection_rejects_partial_inventory(
 ) -> None:
     for name in ("alpha", "zulu"):
         write_test_file(f"tests/test_{name}.py", "def test_one():\n    assert True\n")
-    write_test_file(
-        "tests/test_middle.py",
-        "import pytest\nraise pytest.UsageError('synthetic usage error')\n",
+    pytester.makeconftest(
+        "import pytest\n"
+        "\n"
+        "\n"
+        "def pytest_collectstart(collector):\n"
+        "    if collector.nodeid.endswith('test_zulu.py'):\n"
+        "        raise pytest.UsageError('synthetic usage error')\n"
     )
     result = pytester.runpytest(
         "--collect-only",
