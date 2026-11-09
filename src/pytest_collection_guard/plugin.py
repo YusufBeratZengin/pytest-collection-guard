@@ -22,8 +22,9 @@ from __future__ import annotations
 
 __all__ = ["pytest_addoption", "pytest_configure"]
 
+import os
 import platform
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -132,9 +133,37 @@ def normalize_positional_args(args: Sequence[str], rootdir: Path) -> tuple[str, 
     return tuple(normalized)
 
 
+def normalize_ignore_args(
+    args: Sequence[str], invocation_dir: Path, rootdir: Path
+) -> tuple[str, ...]:
+    """Store ``--ignore`` paths by location, not by the cwd they were typed in.
+
+    pytest itself resolves a relative ``--ignore`` against the invocation
+    directory, so the same string can point at different trees (or nothing)
+    when the run starts from a subdirectory. Recording the raw string would
+    make two manifests claim the same scope while their identities differ
+    (or vice versa); resolving first and storing rootdir-relative keeps the
+    identity stable across working directories.
+    """
+    normalized: list[str] = []
+    for arg in args:
+        path = Path(arg)
+        if not path.is_absolute():
+            path = invocation_dir / path
+        path = Path(os.path.normpath(str(path)))
+        try:
+            path = path.relative_to(rootdir)
+        except ValueError:
+            pass
+        normalized.append(path.as_posix())
+    return tuple(normalized)
+
+
 def build_collection_args(config: pytest.Config) -> CollectionArgs:
     """Snapshot every setting that changes *which* tests are collected."""
     rootdir = Path(str(config.rootpath))
+    invocation = getattr(config, "invocation_params", None)
+    invocation_dir = Path(str(getattr(invocation, "dir", rootdir)))
     ignore_raw = _option_sequence(config, "ignore")
     ignore_glob_raw = _option_sequence(config, "ignore_glob")
     deselect_raw = _option_sequence(config, "deselect")
@@ -147,7 +176,7 @@ def build_collection_args(config: pytest.Config) -> CollectionArgs:
         positional_args=normalize_positional_args(list(config.args), rootdir),
         keyword=_option_str(config, "keyword"),
         markexpr=_option_str(config, "markexpr"),
-        ignore=tuple(sorted(normalize_positional_args(ignore_raw, rootdir))),
+        ignore=tuple(sorted(normalize_ignore_args(ignore_raw, invocation_dir, rootdir))),
         ignore_glob=tuple(sorted(arg.replace("\\", "/") for arg in ignore_glob_raw)),
         deselect=tuple(sorted(arg.replace("\\", "/") for arg in deselect_raw)),
     )
@@ -182,6 +211,7 @@ class _GuardRecorder:
     collected: tuple[str, ...] = ()
     errors: list[str] = field(default_factory=list)
     collection_finished: bool = False
+    collection_interrupted: bool = False
     written: Path | None = None
     write_error: str | None = None
 
@@ -202,10 +232,19 @@ class _GuardRecorder:
         detail = str(longrepr) if longrepr is not None else "unknown collection error"
         self.errors.append(f"{report.nodeid}: {detail}"[:2000])
 
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
+    def pytest_collection(self, session: pytest.Session) -> Generator[None, Any, None]:
+        # pytest_collection_finish also runs from perform_collect's finally
+        # block when collection aborts, so observe the collection outcome too.
+        outcome = yield
+        excinfo = getattr(outcome, "excinfo", None)
+        if excinfo is not None and issubclass(
+            excinfo[0], (KeyboardInterrupt, pytest.exit.Exception)
+        ):
+            self.collection_interrupted = True
+
     def pytest_collection_finish(self, session: pytest.Session) -> None:
-        # Reaching this hook proves collection completed (per-file failures are
-        # recorded separately by pytest_collectreport). A session aborted in
-        # the middle of collection never gets here, so its item list is partial.
+        # This also runs when collection aborts; the wrapper tracks that case.
         self.collection_finished = True
 
     def pytest_internalerror(self, excrepr: Any, excinfo: Any) -> None:
@@ -242,7 +281,7 @@ class _GuardRecorder:
         selected_ids = tuple(sorted({item.nodeid for item in session.items}))
         collected_ids = set(self.collected) or set(selected_ids)
         deselected_ids = tuple(sorted(collected_ids - set(selected_ids)))
-        if not self.collection_finished:
+        if not self.collection_finished or self.collection_interrupted:
             self.errors.append(
                 "collection did not finish (pytest aborted before collection "
                 "completed); the inventory is incomplete"

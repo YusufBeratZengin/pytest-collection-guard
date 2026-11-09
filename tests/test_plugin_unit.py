@@ -13,6 +13,7 @@ from pytest_collection_guard.plugin import (
     _option_sequence,
     _option_str,
     build_collection_args,
+    normalize_ignore_args,
     normalize_positional_args,
 )
 
@@ -144,3 +145,24 @@ def test_build_collection_args_snapshots_all_options(tmp_path: Path) -> None:
     assert args.ignore == ("tests/legacy", "tests/old")
     assert args.ignore_glob == ("tests/legacy/*.py",)
     assert args.deselect == ("tests/test_a.py::test_one",)
+
+
+def test_normalize_ignore_args_resolves_relative_paths_from_invocation_dir(
+    tmp_path: Path,
+) -> None:
+    """The same ignore target typed from two cwds gets one identity."""
+    rootdir = tmp_path
+    from_root = normalize_ignore_args(["tests/slow"], rootdir, rootdir)
+    from_tests_dir = normalize_ignore_args(["slow"], rootdir / "tests", rootdir)
+    assert from_root == ("tests/slow",)
+    assert from_tests_dir == ("tests/slow",)
+
+
+def test_normalize_ignore_args_keeps_resolved_scope_distinct(tmp_path: Path) -> None:
+    """The same literal string from another cwd can mean a different path."""
+    rootdir = tmp_path
+    from_root = normalize_ignore_args(["tests/slow"], rootdir, rootdir)
+    from_tests_dir = normalize_ignore_args(["tests/slow"], rootdir / "tests", rootdir)
+    assert from_root == ("tests/slow",)
+    assert from_tests_dir == ("tests/tests/slow",)
+    assert from_root != from_tests_dir

@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve relative `--ignore` paths from the invocation directory before recording scope.
+- Reject partial inventories when `KeyboardInterrupt` or `pytest.exit` aborts collection,
+  even when the collection finish hook runs or pytest exits successfully.
+- Keep completed collection inventories usable after a test-body `KeyboardInterrupt`.
 - Made `_GuardRecorder` hashable (`@dataclass(eq=False)`) so pluggy's `subset_hook_caller` and pytest's `FSHookProxy` can perform set operations without `TypeError: unhashable type: '_GuardRecorder'` on empty collections and multi-conftest trees.
 - Hardened secret scan in `scripts/check.sh` by distinguishing grep exit code 1 (no match) from execution errors (exit code >= 2), preventing masked scanner failures.
 - Fixed pytest-deck repository link in `README.md` and `README.tr.md`.
